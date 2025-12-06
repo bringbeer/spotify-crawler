@@ -1,9 +1,8 @@
 import os
 import re
-import random
 from PIL import Image
 import numpy as np
-from math import sqrt, ceil
+from math import sqrt
 
 def parse_index_file(index_file="index.txt"):
     """Parse the index file and extract album names with their song counts."""
