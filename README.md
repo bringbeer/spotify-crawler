@@ -52,6 +52,7 @@ Notes:
 - Output files:
 	- `index.txt` — album/artist index and song counts
 	- `covers/` — downloaded `.jpg` album art (sanitized filenames)
+- See https://spotipy.readthedocs.io/en/2.25.2/#getting-started on how to get access to the Spotify API.
 
 `cluster_painter.py` / cluster script — create cluster images
 
