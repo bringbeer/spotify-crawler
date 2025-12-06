@@ -11,8 +11,20 @@ def parse_index_file(index_file="index.txt"):
     artists = {}
     
     try:
-        with open(index_file, "r") as f:
-            content = f.read()
+        # Try reading the index file with common encodings to avoid mojibake
+        # (UTF-8 is preferred; fall back to Windows-1252 / Latin-1 if needed).
+        content = None
+        for enc in ("utf-8", "cp1252", "latin-1"):
+            try:
+                with open(index_file, "r", encoding=enc) as f:
+                    content = f.read()
+                break
+            except UnicodeDecodeError:
+                continue
+        if content is None:
+            # Last resort: read with replacement for undecodable bytes
+            with open(index_file, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
         
         # Extract album section
         album_match = re.search(r"Album Index:\n(.*?)\n(?:Artist Index:|Total songs:)", content, re.DOTALL)
@@ -228,6 +240,75 @@ def build_cluster(albums, covers_dir="covers", output_file="cluster.png"):
             # last resort: place to the right of bounding box
             placements.append({'img': img, 'x': max_x + 1, 'y': min_y, 'w': iw, 'h': ih})
 
+    # Tighten placements: iteratively pull outer images toward cluster center
+    def tighten_placements(placements, max_passes=100):
+        def can_place_at(idx, x, y):
+            pw = placements[idx]['w']
+            ph = placements[idx]['h']
+            rect = (x, y, pw, ph)
+            for j, other in enumerate(placements):
+                if j == idx:
+                    continue
+                if rects_overlap(rect, (other['x'], other['y'], other['w'], other['h'])):
+                    return False
+            return True
+
+        for pass_num in range(max_passes):
+            moved_any = False
+            # compute current center (average of centers)
+            centers_x = [p['x'] + p['w'] / 2.0 for p in placements]
+            centers_y = [p['y'] + p['h'] / 2.0 for p in placements]
+            center_x = sum(centers_x) / len(centers_x)
+            center_y = sum(centers_y) / len(centers_y)
+
+            # process outer items first (farther from center)
+            dists = []
+            for i, p in enumerate(placements):
+                cx = p['x'] + p['w'] / 2.0
+                cy = p['y'] + p['h'] / 2.0
+                d = (cx - center_x) ** 2 + (cy - center_y) ** 2
+                dists.append((d, i))
+            dists.sort(reverse=True)
+
+            for _, i in dists:
+                p = placements[i]
+                px = p['x']
+                py = p['y']
+                pw = p['w']
+                ph = p['h']
+
+                # try to move towards center (max 3 steps per pass to avoid infinite loops)
+                for step_num in range(3):
+                    cx = px + pw / 2.0
+                    cy = py + ph / 2.0
+                    vx = center_x - cx
+                    vy = center_y - cy
+                    step_x = int(np.sign(vx))
+                    step_y = int(np.sign(vy))
+
+                    moved = False
+                    # try x move
+                    if step_x != 0 and can_place_at(i, px + step_x, py):
+                        px += step_x
+                        moved = True
+                        moved_any = True
+                        placements[i]['x'] = px
+
+                    # try y move
+                    if step_y != 0 and can_place_at(i, px, py + step_y):
+                        py += step_y
+                        moved = True
+                        moved_any = True
+                        placements[i]['y'] = py
+
+                    if not moved:
+                        break
+
+            if not moved_any:
+                break
+
+    tighten_placements(placements)
+
     # Calculate bounding box of final placements
     min_x = min(p['x'] for p in placements)
     min_y = min(p['y'] for p in placements)
@@ -241,7 +322,7 @@ def build_cluster(albums, covers_dir="covers", output_file="cluster.png"):
     placements = [(p['img'], int(p['x'] - min_x), int(p['y'] - min_y)) for p in placements]
     
     # Create canvas
-    canvas = Image.new('RGB', (canvas_width, canvas_height), color='white')
+    canvas = Image.new('RGB', (canvas_width, canvas_height), color=(20, 20, 20))
     
     # Place images on canvas
     for img, x, y in placements:
