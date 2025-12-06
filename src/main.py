@@ -33,6 +33,7 @@ def download_album_cover(album_id, album_name, cover_dir):
 def crawl_playlists(playlist_ids, cover_dir="covers"):
     """Crawl playlists and download album covers."""
     album_index = defaultdict(int)
+    artist_index = defaultdict(int)
     songs_data = []
     
     for playlist_id in playlist_ids:
@@ -49,6 +50,10 @@ def crawl_playlists(playlist_ids, cover_dir="covers"):
                     # Add to index
                     album_index[album_name] += 1
                     
+                    # Add artist to index
+                    for artist in track['artists']:
+                        artist_index[artist['name']] += 1
+                    
                     # Download cover
                     cover_path = download_album_cover(album_id, album_name, cover_dir)
                     
@@ -62,7 +67,7 @@ def crawl_playlists(playlist_ids, cover_dir="covers"):
             # Get next page
             results = sp.next(results) if results['next'] else None
     
-    return songs_data, album_index
+    return songs_data, album_index, artist_index
 
 if __name__ == "__main__":
     # Example playlist IDs
@@ -74,11 +79,26 @@ if __name__ == "__main__":
                      "07NRNtwOGbAD45StA2s5ys",
                      "3R4JUuEoF40FQJ1scrt658"]
     
-    songs, albums = crawl_playlists(playlist_ids)
+    songs, albums, artists = crawl_playlists(playlist_ids)
     
     # Print album index
     print("Album Index:")
     for album, count in sorted(albums.items()):
         print(f"  {album}: {count} songs")
     
+    # Print artist index
+    print("\nArtist Index:")
+    for artist, count in sorted(artists.items()):
+        print(f"  {artist}: {count} songs")
+    
     print(f"\nTotal songs: {len(songs)}")
+    
+    # Save index to file
+    with open("index.txt", "w") as f:
+        f.write("Album Index:\n")
+        for album, count in sorted(albums.items()):
+            f.write(f"  {album}: {count} songs\n")
+        f.write("\nArtist Index:\n")
+        for artist, count in sorted(artists.items()):
+            f.write(f"  {artist}: {count} songs\n")
+        f.write(f"\nTotal songs: {len(songs)}\n")
