@@ -320,8 +320,19 @@ def build_cluster(albums, covers_dir="covers", output_file="cluster.png"):
     # Normalize coordinates
     placements = [(p['img'], int(p['x'] - min_x), int(p['y'] - min_y)) for p in placements]
     
-    # Create canvas
-    canvas = Image.new('RGB', (canvas_width, canvas_height), color=(20, 20, 20))
+    # Make canvas square: use the larger dimension and center the cluster
+    canvas_size = max(canvas_width, canvas_height)
+    padding_x = (canvas_size - canvas_width) // 2
+    padding_y = (canvas_size - canvas_height) // 2
+    placements = [(img, x + padding_x, y + padding_y) for img, x, y in placements]
+    
+    # Add 15px margin on all sides
+    margin = 15
+    canvas_size += 2 * margin
+    placements = [(img, x + margin, y + margin) for img, x, y in placements]
+    
+    # Create square canvas
+    canvas = Image.new('RGB', (canvas_size, canvas_size), color=(20, 20, 20))
     
     # Place images on canvas
     for img, x, y in placements:
@@ -331,7 +342,7 @@ def build_cluster(albums, covers_dir="covers", output_file="cluster.png"):
     canvas.save(output_file)
     print(f"Cluster image saved to {output_file}")
     print(f"Total albums: {len(placements)}")
-    print(f"Canvas size: {canvas_width}x{canvas_height}")
+    print(f"Canvas size: {canvas_size}x{canvas_size} (square)")
 
 if __name__ == "__main__":
     albums, artists = parse_index_file("index.txt")
